@@ -130,6 +130,7 @@ function beginGame(mode, label) {
   state.mode = mode;
   state.idx = 0; state.score = 0; state.combo = 0;
   state.correct = 0; state.wrong = 0; state.answered = false;
+  state.startTime = Date.now();
   hide('modeSel'); hide('home'); hide('result'); show('game');
   $('gameLabel').textContent = label;
   hide('nextBtn');
@@ -382,6 +383,7 @@ function finishQuizLike() {
   const pct = total ? Math.round(state.correct / total * 100) : 0;
   const xp = state.correct * 5 + Math.floor(state.score / 10);
   recordResult(pct, xp);
+  state.lastResult = { total, pct };
   const stars = pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 40 ? 1 : 0;
   const emoji = pct >= 90 ? '🏆' : pct >= 70 ? '🎉' : pct >= 40 ? '👍' : '💪';
   const msg = pct >= 90 ? '완벽해요!' : pct >= 70 ? '잘했어요!' : pct >= 40 ? '조금만 더!' : '복습이 필요해요';
@@ -398,11 +400,39 @@ function finishQuizLike() {
         <div class="rstat"><div class="v">${pct}%</div><div class="l">정답률</div></div>
         <div class="rstat"><div class="v" style="color:var(--gold)">+${xp}</div><div class="l">XP</div></div>
       </div>
+      ${submitButtonHtml()}
       <div class="row" style="justify-content:center;margin-top:20px">
         <button class="btn sec" onclick="openUnit(state.unit)">단원으로</button>
         <button class="btn" onclick="retryMode()">다시 도전</button>
       </div>
     </div>`;
+}
+
+/* ---------- 결과 제출 (교사 링크로 배포 시에만 노출) ---------- */
+function submitEnabled() {
+  return !!(window.ResultCollector && ResultCollector.config && ResultCollector.config.endpoint);
+}
+function submitButtonHtml() {
+  if (!submitEnabled()) return '';
+  return `<div class="row" style="justify-content:center;margin-top:6px">
+      <button class="btn" id="submitBtn" style="background:#16a34a"
+        onclick="submitResult()">📤 선생님께 결과 제출</button></div>`;
+}
+function submitResult() {
+  if (!submitEnabled()) return;
+  const modeName = { quiz: '스피드퀴즈', ox: 'OX', cards: '개념카드', match: '매칭' }[state.mode] || '';
+  const subj = DATA[state.subject].short;
+  // 시트 탭을 '과목 · 단원'으로 분리 (교사가 단원별로 확인 가능)
+  ResultCollector.config.tool = '컴활1급 ' + subj + ' · ' + state.unit.name;
+  const r = state.lastResult || { total: state.correct + state.wrong, pct: 0 };
+  ResultCollector.open({
+    score: state.score,
+    correct: state.correct,
+    total: r.total,
+    durationSec: Math.round((Date.now() - (state.startTime || Date.now())) / 1000),
+    labels: { correct: '맞힘', total: '문항수', wrong: '모드' },
+    wrong: modeName,
+  });
 }
 function showSimpleDone(emoji, title, sub, xp) {
   hide('game'); show('result');
