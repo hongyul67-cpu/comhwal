@@ -30,10 +30,30 @@ let PROG = loadProg();
 PROG.units = PROG.units || {};
 PROG.totXp = PROG.totXp || 0;
 PROG.totStar = PROG.totStar || 0;
+PROG.wrong = PROG.wrong || {};   // 누적 오답: key → {subj, unitId, kind:'quiz'|'ox', q}
+
+/* ---------- 누적 오답 ---------- */
+function wrongKey(subj, unitId, kind, text) { return subj + '|' + unitId + '|' + kind + '|' + String(text).slice(0, 60); }
+function markWrong(subj, unitId, kind, text) {
+  PROG.wrong[wrongKey(subj, unitId, kind, text)] = { subj: subj, unitId: unitId, kind: kind, q: text };
+  saveProg(PROG);
+}
+function clearWrong(subj, unitId, kind, text) {
+  var k = wrongKey(subj, unitId, kind, text);
+  if (PROG.wrong[k]) { delete PROG.wrong[k]; saveProg(PROG); }
+}
+function wrongList() {
+  return Object.keys(PROG.wrong).map(function (k) { return PROG.wrong[k]; })
+    .filter(function (w) { return DATA[w.subj] && DATA[w.subj].ready; });
+}
 
 function unitKey(subj, unitId) { return subj + '/' + unitId; }
 
 function recordResult(pct, xpGain) {
+  if (!state.unit) {                 // 오답 복습 등 특정 단원이 아닌 경우: XP만 적립
+    PROG.totXp += xpGain; saveProg(PROG); updateHeader();
+    return;
+  }
   const key = unitKey(state.subject, state.unit.id);
   const stars = pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 40 ? 1 : 0;
   const rec = PROG.units[key] || { best: 0, stars: 0, xp: 0 };
@@ -114,7 +134,19 @@ function renderUnits() {
 function renderHome() {
   hide('modeSel'); hide('game'); hide('result'); show('home');
   renderSubjects();
+  renderReviewBar();
   renderUnits();
+}
+function renderReviewBar() {
+  var box = $('reviewBar');
+  if (!box) return;
+  var n = wrongList().length;
+  if (!n) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="revcard">' +
+    '<div><div class="revnm">🔁 오답 복습</div>' +
+    '<div class="revds">틀렸던 문제 <b>' + n + '개</b>만 다시 풀어요 · 맞히면 목록에서 빠져요</div></div>' +
+    '<button class="btn" onclick="startReview()">복습 시작</button></div>';
 }
 function goHome() { renderHome(); }
 
@@ -144,8 +176,9 @@ function updateHud(total) {
   else c.classList.add('hidden');
 }
 function quitGame() {
-  if (state.mode === 'cards' || confirm('게임을 그만두시겠어요? 진행 중인 점수는 저장되지 않아요.'))
-    openUnit(state.unit);
+  if (state.mode === 'cards' || confirm('게임을 그만두시겠어요? 진행 중인 점수는 저장되지 않아요.')) {
+    if (state.unit) openUnit(state.unit); else renderHome();
+  }
 }
 
 /* ============ 1) 개념 카드 ============ */
@@ -254,6 +287,13 @@ function answerQuiz(sel) {
     state.combo = 0; state.wrong++;
     toast(sel === -1 ? '시간 초과!' : '오답', 'var(--no)');
   }
+  // 누적 오답 기록/해제
+  (function () {
+    var subj = item.subj || state.subject;
+    var uid = item.unitId || (state.unit && state.unit.id);
+    if (!uid) return;
+    if (correct) clearWrong(subj, uid, 'quiz', item.q); else markWrong(subj, uid, 'quiz', item.q);
+  })();
   $('hudScore').textContent = state.score + '점';
   $('expBox').innerHTML = `<div class="exp ${correct ? 'ok' : 'no'}">
     <b>${correct ? '✅ 정답' : '❌ ' + (sel === -1 ? '시간 초과' : '오답')}</b>${item.ex}</div>`;
@@ -305,6 +345,13 @@ function answerOX(val) {
     state.combo = 0; state.wrong++;
     toast('오답', 'var(--no)');
   }
+  // 누적 오답 기록/해제
+  (function () {
+    var subj = item.subj || state.subject;
+    var uid = item.unitId || (state.unit && state.unit.id);
+    if (!uid) return;
+    if (correct) clearWrong(subj, uid, 'ox', item.s); else markWrong(subj, uid, 'ox', item.s);
+  })();
   $('hudScore').textContent = state.score + '점';
   $('expBox').innerHTML = `<div class="exp ${correct ? 'ok' : 'no'}">
     <b>${correct ? '✅ 정답 (' + (item.a ? 'O' : 'X') + ')' : '❌ 오답 (정답: ' + (item.a ? 'O' : 'X') + ')'}</b>${item.ex}</div>`;
@@ -368,12 +415,46 @@ function pickMatch(el) {
   }
 }
 
+/* ============ 5) 오답 복습 (퀴즈·OX 혼합) ============ */
+function startReview() {
+  var list = wrongList();
+  if (!list.length) return;
+  beginGame('review', '🔁 오답 복습');
+  state.unit = null;                       // 특정 단원이 아님
+  $('hudScore').classList.remove('hidden');
+  var q = [];
+  list.forEach(function (w) {
+    var subj = DATA[w.subj]; if (!subj) return;
+    var unit = subj.units.filter(function (u) { return u.id === w.unitId; })[0];
+    if (!unit) return;
+    if (w.kind === 'quiz') {
+      var src = (unit.quiz || []).filter(function (x) { return String(x.q).slice(0, 60) === w.q; })[0];
+      if (!src) return;
+      var opts = shuffle(src.o.map(function (t, i) { return { t: t, correct: i === src.a }; }));
+      q.push({ kind: 'quiz', subj: w.subj, unitId: w.unitId, q: src.q, opts: opts,
+        ans: opts.findIndex(function (o) { return o.correct; }), ex: src.ex });
+    } else {
+      var so = (unit.ox || []).filter(function (x) { return String(x.s).slice(0, 60) === w.q; })[0];
+      if (!so) return;
+      q.push({ kind: 'ox', subj: w.subj, unitId: w.unitId, s: so.s, a: so.a, ex: so.ex });
+    }
+  });
+  if (!q.length) { alert('복습할 오답을 찾지 못했어요.'); renderHome(); return; }
+  state.queue = shuffle(q);
+  renderReviewItem();
+}
+function renderReviewItem() {
+  var it = state.queue[state.idx];
+  if (it.kind === 'quiz') renderQuiz(); else renderOX();
+}
+
 /* ============ 결과 화면 ============ */
 function nextStep() {
   if (state.idx < state.queue.length - 1) {
     state.idx++;
     if (state.mode === 'quiz') renderQuiz();
     else if (state.mode === 'ox') renderOX();
+    else if (state.mode === 'review') renderReviewItem();
   } else {
     finishQuizLike();
   }
@@ -402,7 +483,8 @@ function finishQuizLike() {
       </div>
       ${submitButtonHtml()}
       <div class="row" style="justify-content:center;margin-top:20px">
-        <button class="btn sec" onclick="openUnit(state.unit)">단원으로</button>
+        ${state.unit ? '<button class="btn sec" onclick="openUnit(state.unit)">단원으로</button>'
+                     : '<button class="btn sec" onclick="goHome()">홈으로</button>'}
         <button class="btn" onclick="retryMode()">다시 도전</button>
       </div>
     </div>`;
@@ -454,6 +536,7 @@ function retryMode() {
   else if (m === 'quiz') startQuiz();
   else if (m === 'ox') startOX();
   else if (m === 'match') startMatch();
+  else if (m === 'review') { if (wrongList().length) startReview(); else renderHome(); }
 }
 
 /* ---------- init ---------- */
