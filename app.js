@@ -42,9 +42,26 @@ function clearWrong(subj, unitId, kind, text) {
   var k = wrongKey(subj, unitId, kind, text);
   if (PROG.wrong[k]) { delete PROG.wrong[k]; saveProg(PROG); }
 }
+// 저장된 오답 → 실제 문항으로 복원 (못 찾으면 null)
+function resolveWrong(w) {
+  var subj = DATA[w.subj];
+  if (!subj || !subj.ready) return null;
+  var unit = subj.units.filter(function (u) { return u.id === w.unitId; })[0];
+  if (!unit) return null;
+  var src = (w.kind === 'quiz')
+    ? (unit.quiz || []).filter(function (x) { return String(x.q).slice(0, 60) === w.q; })[0]
+    : (unit.ox || []).filter(function (x) { return String(x.s).slice(0, 60) === w.q; })[0];
+  return src ? { w: w, unit: unit, src: src } : null;
+}
+// 복원 가능한 오답만 반환. 문제 텍스트가 바뀌어 못 찾는 옛 기록은 정리(자가 치유).
 function wrongList() {
-  return Object.keys(PROG.wrong).map(function (k) { return PROG.wrong[k]; })
-    .filter(function (w) { return DATA[w.subj] && DATA[w.subj].ready; });
+  var out = [], pruned = false;
+  Object.keys(PROG.wrong).forEach(function (k) {
+    if (resolveWrong(PROG.wrong[k])) out.push(PROG.wrong[k]);
+    else { delete PROG.wrong[k]; pruned = true; }
+  });
+  if (pruned) saveProg(PROG);
+  return out;
 }
 
 function unitKey(subj, unitId) { return subj + '/' + unitId; }
@@ -424,19 +441,14 @@ function startReview() {
   $('hudScore').classList.remove('hidden');
   var q = [];
   list.forEach(function (w) {
-    var subj = DATA[w.subj]; if (!subj) return;
-    var unit = subj.units.filter(function (u) { return u.id === w.unitId; })[0];
-    if (!unit) return;
+    var r = resolveWrong(w); if (!r) return;
+    var src = r.src;
     if (w.kind === 'quiz') {
-      var src = (unit.quiz || []).filter(function (x) { return String(x.q).slice(0, 60) === w.q; })[0];
-      if (!src) return;
       var opts = shuffle(src.o.map(function (t, i) { return { t: t, correct: i === src.a }; }));
       q.push({ kind: 'quiz', subj: w.subj, unitId: w.unitId, q: src.q, opts: opts,
         ans: opts.findIndex(function (o) { return o.correct; }), ex: src.ex });
     } else {
-      var so = (unit.ox || []).filter(function (x) { return String(x.s).slice(0, 60) === w.q; })[0];
-      if (!so) return;
-      q.push({ kind: 'ox', subj: w.subj, unitId: w.unitId, s: so.s, a: so.a, ex: so.ex });
+      q.push({ kind: 'ox', subj: w.subj, unitId: w.unitId, s: src.s, a: src.a, ex: src.ex });
     }
   });
   if (!q.length) { alert('복습할 오답을 찾지 못했어요.'); renderHome(); return; }
