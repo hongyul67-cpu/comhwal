@@ -477,6 +477,8 @@ function finishQuizLike() {
   const xp = state.correct * 5 + Math.floor(state.score / 10);
   recordResult(pct, xp);
   state.lastResult = { total, pct };
+  /* 랭킹전 — 채점 후 RP 정산 */
+  if (window.RankKit) RankKit.award(pct, '컴활 1급 필기 개념');
   const stars = pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 40 ? 1 : 0;
   const emoji = pct >= 90 ? '🏆' : pct >= 70 ? '🎉' : pct >= 40 ? '👍' : '💪';
   const msg = pct >= 90 ? '완벽해요!' : pct >= 70 ? '잘했어요!' : pct >= 40 ? '조금만 더!' : '복습이 필요해요';
