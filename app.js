@@ -509,25 +509,33 @@ function submitEnabled() {
   return !!(window.ResultCollector && ResultCollector.config && ResultCollector.config.endpoint);
 }
 function submitButtonHtml() {
-  if (!submitEnabled()) return '';
+  
   return `<div class="row" style="justify-content:center;margin-top:6px">
       <button class="btn" id="submitBtn" style="background:#16a34a"
         onclick="submitResult()">📤 선생님께 결과 제출</button></div>`;
 }
+function submitGuide() {
+  alert(['이 링크로는 제출이 되지 않아요.', '',
+    '선생님이 나눠 준 제출용 링크(주소 뒤에 ?rc=... 가 붙은 링크)로',
+    '들어와야 반·번호를 입력하고 결과를 보낼 수 있습니다.', '',
+    '연습은 지금 이대로 계속 하셔도 됩니다.'].join(String.fromCharCode(10)));
+}
 function submitResult() {
-  if (!submitEnabled()) return;
+  if (!submitEnabled()) { submitGuide(); return; }
   const modeName = { quiz: '스피드퀴즈', ox: 'OX', cards: '개념카드', match: '매칭' }[state.mode] || '';
   const subj = DATA[state.subject].short;
   // 시트 탭을 '과목 · 단원'으로 분리 (교사가 단원별로 확인 가능)
-  ResultCollector.config.tool = '컴활1급 ' + subj + ' · ' + state.unit.name;
+  // 시트 탭은 하나로 — 과목·단원·모드는 mode 로 보낸다 (규약 §1 ①)
+  ResultCollector.config.tool = '컴활 1급 마스터';
   const r = state.lastResult || { total: state.correct + state.wrong, pct: 0 };
   ResultCollector.open({
     score: state.score,
     correct: state.correct,
     total: r.total,
     durationSec: Math.round((Date.now() - (state.startTime || Date.now())) / 1000),
-    labels: { correct: '맞힘', total: '문항수', wrong: '모드' },
-    wrong: modeName,
+    labels: { correct: '맞힘', total: '문항수' },
+    mode: subj + ' · ' + state.unit.name + ' — ' + (modeName || '학습'),
+    extra: [state.unit.name + ' 개념 학습'],
   });
 }
 function showSimpleDone(emoji, title, sub, xp) {
