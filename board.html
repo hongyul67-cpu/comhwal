@@ -44,6 +44,10 @@
   .fig{background:#fff;border-radius:12px;padding:8px;text-align:center;margin-bottom:8px}
   .fig img{max-width:100%;max-height:38vh;object-fit:contain;display:block;margin:0 auto}
   .cap{color:var(--dim);font-size:12.5px;text-align:center;margin:0 0 14px}
+  .bl{display:inline-block;min-width:3.4em;padding:0 .35em;margin:0 .12em;border-radius:5px;
+      background:#1d3350;border-bottom:2px solid #7fc4ff;color:transparent;cursor:pointer;
+      font-weight:800;user-select:none}
+  .bl.on{background:rgba(127,196,255,.16);color:#9fe0ff;border-bottom-color:#9fe0ff;cursor:default}
   .pts{list-style:none;padding:0;margin:0 0 14px}
   .pts li{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
     border-radius:9px;padding:11px 14px;margin-bottom:8px;font-size:clamp(14px,2vw,17px)}
@@ -151,7 +155,12 @@ function render(){
   if(s.svg) h += '<div class="figsvg">' + s.svg + '</div>';
   if(s.img) h += '<div class="fig"><img src="' + s.img + '" alt=""></div>';
   if(s.cap) h += '<p class="cap">' + esc(s.cap) + '</p>';
-  h += '<ul class="pts">' + (s.pts||[]).map(function(p){ return '<li>' + p + '</li>'; }).join('') + '</ul>';
+  /* 본문의 {{답}} 은 빈칸 — 눌러야 답이 보인다. */
+  h += '<ul class="pts">' + (s.pts||[]).map(function(p){
+         return '<li>' + String(p).replace(/\{\{(.+?)\}\}/g, function(_, a){
+           return '<span class="bl" tabindex="0">' + esc(a) + '</span>';
+         }) + '</li>';
+       }).join('') + '</ul>';
 
   if(B.step >= 1 && s.ask) h += '<div class="ask"><b>발문</b> — ' + esc(s.ask) + '</div>';
   if(B.step >= 2 && s.ansq){
@@ -168,6 +177,9 @@ function render(){
        + esc(s.go[0]) + ' ↗</a>';
 
   document.getElementById('bIn').innerHTML = h;
+  Array.prototype.forEach.call(document.querySelectorAll('#bIn .bl'), function(el){
+    el.addEventListener('click', function(){ el.classList.add('on'); });
+  });
   document.querySelector('.b-body').scrollTop = 0;
   document.getElementById('bPrev').disabled = (B.i === 0 && B.step === 0);
   document.getElementById('bNext').textContent =
