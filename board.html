@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>컴퓨터활용능력 · 전자칠판 수업자료</title>
 <script src="lesson.js"></script>
+<script src="lesson-plus.js"></script>
 <style>
   :root{--bg:#0c1017;--panel:#161c27;--panel2:#1e2634;--line:#2c3648;--ink:#e9eefa;--dim:#98a5bd;
         --accent:#5b8cff;--good:#3ad995;--bad:#ff5f6d;--gold:#ffd166;--r:14px}
@@ -19,6 +20,12 @@
     border-radius:999px;padding:6px 13px}
   .links a:hover{color:var(--ink);border-color:var(--accent)}
   /* 단원 선택 */
+  .gradebar{display:flex;gap:9px;align-items:center;margin:0 0 16px}
+  .gradebar .lb{color:var(--dim);font-size:13px;font-weight:700;margin-right:2px}
+  .gradebar button{background:var(--panel);color:var(--dim);border:1px solid var(--line);border-radius:999px;
+    padding:9px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:.12s}
+  .gradebar button:hover{border-color:var(--accent);color:var(--ink)}
+  .gradebar button.on{background:linear-gradient(135deg,#3b82f6,#5b8cff);border-color:transparent;color:#fff}
   .units{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:11px}
   .unit{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;
     cursor:pointer;text-align:left;color:inherit;font:inherit;transition:.12s}
@@ -82,9 +89,15 @@
   <div class="links">
     <a href="index.html" id="hubLink">💻 학생용 개념게임 →</a>
   </div>
+  <div class="gradebar">
+    <span class="lb">오늘 수업은</span>
+    <button id="g1Btn">1급</button>
+    <button id="g2Btn">2급</button>
+  </div>
   <div class="units" id="units"></div>
   <button class="allbtn" id="allBtn">▶ 1단원부터 순서대로 시작</button>
-  <p class="hint"><b>① 컴퓨터 일반 · ② 스프레드시트는 1급 · 2급 공통</b>이고, <b>③ 데이터베이스는 1급</b>에만 나옵니다 — 2급 수업이면 ①②만 돌리세요.<br>슬라이드 끝의 버튼을 누르면 개념게임 · 필기 CBT · 실기 연습소로 넘어갑니다(<code>?rc=…</code> 유지).</p>
+  <p class="hint" id="gradeHint"></p>
+  <p class="hint">슬라이드 끝의 버튼을 누르면 개념게임 · 필기 CBT · 실기 연습소로 넘어갑니다(<code>?rc=…</code> 유지).</p>
 </div>
 
 <div id="board" class="hidden">
@@ -106,20 +119,58 @@ var DECK = window.LESSON || [];
 var UNIT = window.UNITS || [];
 var B = { list: [], i: 0, step: 0 };   // step 0 요점 → 1 발문 → 2 퀴즈 → 3 정답
 
+/* ── 급수 고르기 ── 2급을 고르면 1급 전용 슬라이드를 빼고 보여 준다.
+   마지막에 고른 급수를 기억해 다음 수업에 그대로 열리게 한다. */
+var GRADE = 2;
+try { GRADE = Number(localStorage.getItem('board_grade')) === 1 ? 1 : 2; } catch(e){}
+
+/* 그 급수에서 실제로 쓸 슬라이드 번호 목록 */
+function idxOf(u){ return GRADE === 1 ? u.idx : (u.idx2 || u.idx); }
+
 /* ── 단원 목록 ── */
-(function renderHome(){
+function renderHome(){
+  document.getElementById('g1Btn').classList.toggle('on', GRADE === 1);
+  document.getElementById('g2Btn').classList.toggle('on', GRADE === 2);
+
+  var shown = UNIT.filter(function(u){ return idxOf(u).length > 0; });
   var box = document.getElementById('units');
-  box.innerHTML = UNIT.map(function(u, k){
-    return '<button class="unit" data-u="'+k+'"><b>'+esc(u.name)+'</b>'
-         + '<span class="ds">슬라이드 '+u.idx.length+'장</span></button>';
+  box.innerHTML = shown.map(function(u){
+    var n = idxOf(u).length;
+    return '<button class="unit" data-u="'+esc(u.name)+'"><b>'+esc(u.name)+'</b>'
+         + '<span class="ds">슬라이드 '+n+'장</span></button>';
   }).join('');
+
+  var total = shown.reduce(function(a,u){ return a + idxOf(u).length; }, 0);
+  document.getElementById('allBtn').textContent =
+    '▶ 1단원부터 순서대로 시작 (' + total + '장)';
+
+  var hidden = UNIT.filter(function(u){ return idxOf(u).length === 0; })
+                   .map(function(u){ return u.name; });
+  document.getElementById('gradeHint').innerHTML = GRADE === 1
+    ? '<b>1급 수업</b> — 데이터베이스(액세스)까지 모두 나옵니다. 슬라이드 ' + total + '장.'
+    : '<b>2급 수업</b> — 스프레드시트까지만 나옵니다. 슬라이드 ' + total + '장.'
+      + (hidden.length ? ' <span style="color:var(--dim)">(1급 전용이라 숨김 : ' + esc(hidden.join(' · ')) + ')</span>' : '');
+}
+(function bindHome(){
+  var box = document.getElementById('units');
   box.addEventListener('click', function(e){
     var b = e.target.closest('[data-u]'); if(!b) return;
-    openBoard(UNIT[+b.dataset.u].idx);
+    var u = UNIT.filter(function(x){ return x.name === b.dataset.u; })[0];
+    if(u) openBoard(idxOf(u));
   });
   document.getElementById('allBtn').onclick = function(){
-    openBoard(DECK.map(function(_,i){ return i; }));
+    var list = [];
+    UNIT.forEach(function(u){ idxOf(u).forEach(function(i){ list.push(i); }); });
+    openBoard(list);
   };
+  function setGrade(g){
+    GRADE = g;
+    try { localStorage.setItem('board_grade', String(g)); } catch(e){}
+    renderHome();
+  }
+  document.getElementById('g1Btn').onclick = function(){ setGrade(1); };
+  document.getElementById('g2Btn').onclick = function(){ setGrade(2); };
+  renderHome();
 })();
 
 /* 선생님이 ?rc=… 로 열었다면 학생용 도구로 넘어갈 때도 그대로 붙여 준다 */
@@ -178,7 +229,12 @@ function render(){
 
   document.getElementById('bIn').innerHTML = h;
   Array.prototype.forEach.call(document.querySelectorAll('#bIn .bl'), function(el){
-    el.addEventListener('click', function(){ el.classList.add('on'); });
+    function open(){ el.classList.add('on'); }
+    el.addEventListener('click', open);
+    /* tabindex 가 있으니 키보드·프레젠터 리모컨으로도 열 수 있어야 한다 */
+    el.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); open(); }
+    });
   });
   document.querySelector('.b-body').scrollTop = 0;
   document.getElementById('bPrev').disabled = (B.i === 0 && B.step === 0);
