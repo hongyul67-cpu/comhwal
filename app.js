@@ -149,7 +149,7 @@ function renderUnits() {
 }
 
 function renderHome() {
-  hide('modeSel'); hide('game'); hide('result'); show('home');
+  hide('modeSel'); hide('game'); hide('result'); hide('board'); show('home');
   renderSubjects();
   renderReviewBar();
   renderUnits();
@@ -167,10 +167,64 @@ function renderReviewBar() {
 }
 function goHome() { renderHome(); }
 
+/* ---------- 수업 슬라이드(전자칠판) ----------
+   예전에는 board.html 이 따로 있었다. 이제 입구는 index.html 하나뿐이고
+   원고는 lesson.js · lesson-plus.js, 화면은 공용 board.js 가 담당한다.
+   1급 / 2급 은 board.js 의 tabs 로 갈라 준다 —
+   UNITS 의 idx 는 1급(전부), idx2 는 2급에서 쓸 슬라이드만 모은 것이다. */
+var boardReady = false;
+function goBoard() {
+  hide('home'); hide('modeSel'); hide('game'); hide('result'); show('board');
+  openBoardHome();
+}
+function openBoardHome() {
+  if (boardReady) return;
+  var el = $('boardHome');
+  if (!el) return;
+  if (!window.Board || !window.UNITS) {
+    el.innerHTML = '<p style="color:var(--tx2)">수업자료를 불러오지 못했습니다.</p>';
+    return;
+  }
+  var U = window.UNITS;
+  function make(pick) {
+    return U.map(function (u) { return { name: u.name, idx: pick(u) }; })
+            .filter(function (u) { return u.idx.length > 0; });
+  }
+  var t1 = make(function (u) { return u.idx; });
+  var t2 = make(function (u) { return u.idx2 || u.idx; });
+  function total(t) { return t.reduce(function (a, u) { return a + u.idx.length; }, 0); }
+  var only1 = U.filter(function (u) { return (u.idx2 || u.idx).length === 0; })
+               .map(function (u) { return u.name; });
+
+  Board.home(el, { tabs: [
+    { label: '1급',
+      units: t1,
+      hint: '<b>1급 수업</b> — 데이터베이스(액세스)까지 모두 나옵니다. 슬라이드 ' + total(t1) + '장.' },
+    { label: '2급',
+      units: t2,
+      hint: '<b>2급 수업</b> — 스프레드시트까지만 나옵니다. 슬라이드 ' + total(t2) + '장.'
+          + (only1.length ? ' (1급 전용이라 숨김 : ' + only1.join(' · ') + ')' : '') }
+  ] });
+
+  /* 마지막에 고른 급수를 기억한다 — 예전 board.html 이 하던 것을 그대로 옮겼다.
+     board.js 의 탭 버튼을 그대로 눌러 주는 방식이라 공용 파일은 손대지 않는다. */
+  el.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-tab]');
+    if (t) { try { localStorage.setItem('board_grade', t.dataset.tab === '0' ? '1' : '2'); } catch (err) {} }
+  });
+  var saved = 2;
+  try { saved = Number(localStorage.getItem('board_grade')) === 1 ? 1 : 2; } catch (err) {}
+  if (saved === 2) {
+    var b2 = el.querySelector('[data-tab="1"]');
+    if (b2) b2.click();
+  }
+  boardReady = true;
+}
+
 /* ---------- 모드 선택 ---------- */
 function openUnit(u) {
   state.unit = u;
-  hide('home'); hide('game'); hide('result'); show('modeSel');
+  hide('home'); hide('game'); hide('result'); hide('board'); show('modeSel');
   $('modeUnitName').textContent = DATA[state.subject].icon + ' ' + u.name;
 }
 

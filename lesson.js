@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════
    컴퓨터활용능력 전자칠판 수업자료 — 슬라이드 원고
-   board.html 에서 window.LESSON / window.UNITS 로 읽는다.
+   index.html 이 window.LESSON / window.UNITS 로 읽어 공용 board.js 에 넘긴다.
 
    ① 컴퓨터 일반 · ② 스프레드시트 = 1급 · 2급 공통
    ③ 데이터베이스               = 1급에만 나온다

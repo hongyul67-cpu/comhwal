@@ -4,7 +4,7 @@
 
    슬라이드 한 장의 모양 (lesson.js와 같다)
      { u:단원, t:제목, g:급수, svg, cap, pts:[…], ask, ansq, anso, ansa, anse, go }
-   · g:2 = 1급·2급 공통,  g:1 = 1급에서만 다룬다 → board.html의 급수 고르기에 쓰인다
+   · g:2 = 1급·2급 공통,  g:1 = 1급에서만 다룬다 → 수업 슬라이드의 급수 고르기에 쓰인다
    · pts 안의 {{말}} 은 빈칸이 되어, 눌러야 답이 보인다 (판서용)
    ══════════════════════════════════════════════════════════════ */
 (function () {
@@ -945,7 +945,7 @@
   order.forEach(function (u) {
     // 단원 안이 전부 1급 전용이면 그 단원은 2급 수업에서 통째로 감춘다
     u.only1 = u.idx.every(function (i) { return L[i].g === 1; });
-    // 2급 수업에서 쓸 슬라이드만 모아 둔다 (board.html의 급수 고르기가 쓴다)
+    // 2급 수업에서 쓸 슬라이드만 모아 둔다 (수업 슬라이드의 급수 고르기가 쓴다)
     u.idx2 = u.idx.filter(function (i) { return L[i].g !== 1; });
   });
   window.UNITS = order;
