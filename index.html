@@ -173,7 +173,10 @@
   .rstat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-width:80px}
   .rstat .v{font-size:22px;font-weight:800} .rstat .l{font-size:11px;color:var(--tx2)}
 
-  .toast{position:fixed;left:50%;top:20%;transform:translateX(-50%);z-index:50;
+  /* opacity:0 이 기본값 — 애니메이션이 끝나면 다시 투명해진다.
+     (fill-mode 가 없어서 애니메이션 뒤 opacity 가 1로 돌아가 「짝!」·「정답! +18」 같은 글자가
+      화면 한가운데 계속 남아 있었다. 다른 화면으로 넘어가도 사라지지 않았다.) */
+  .toast{position:fixed;left:50%;top:20%;transform:translateX(-50%);z-index:50;opacity:0;
     font-size:30px;font-weight:900;pointer-events:none;text-shadow:0 4px 12px rgba(0,0,0,.5)}
   .toast.show{animation:toastanim .8s ease-out}
   @keyframes toastanim{0%{opacity:0;transform:translateX(-50%) scale(.6)}
@@ -240,7 +243,7 @@
     <div id="boardHome"></div>
   </section>
 
-  <div class="footer">컴퓨터활용능력 1급 필기 · 개념 학습 게임<br>스프레드시트(엑셀)·데이터베이스(액세스) 과목은 준비 중입니다</div>
+  <div class="footer">컴퓨터활용능력 1급 필기 · 개념 학습 게임<br>컴퓨터 일반 10단원 · 스프레드시트 6단원 · 데이터베이스 6단원</div>
 </div>
 
 <div class="toast" id="toast"></div>
